@@ -48,6 +48,9 @@ const originalPreview = document.getElementById('original-preview');
 
 const submitBtn = document.getElementById('submit-btn');
 const printBtn = document.getElementById('print-btn');
+const helpBtn = document.getElementById('help-btn');
+const helpModal = document.getElementById('help-modal');
+const closeHelp = document.getElementById('close-help');
 const cancelBtn = document.getElementById('cancel-btn');
 const loading = document.getElementById('loading');
 const progressBar = document.getElementById('progress-bar');
@@ -82,6 +85,12 @@ function handleFile(file) {
 
 printBtn.addEventListener('click', () => { window.print(); });
 cancelBtn.addEventListener('click', () => { isCancelled = true; });
+
+helpBtn.addEventListener('click', () => helpModal.classList.remove('hidden'));
+closeHelp.addEventListener('click', () => helpModal.classList.add('hidden'));
+window.addEventListener('click', (e) => {
+    if (e.target === helpModal) helpModal.classList.add('hidden');
+});
 
 placeholder.addEventListener('click', () => fileInput.click());
 placeholder.addEventListener('dragover', (e) => { e.preventDefault(); placeholder.style.color = 'var(--accent)'; });
@@ -137,11 +146,11 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
 
     try {
         const backendHost = window.location.hostname;
+        labels.forEach(el => el.textContent = "Generating Stipples...");
         const response = await fetch(`http://${backendHost}:8000/process-image`, {
             method: 'POST', body: formData
         });
 
-        await updateProgress(30, "Generating Stipples...", 2000);
         if (isCancelled) throw new Error('CANCELLED');
         if (!response.ok) throw new Error('Failed to process image');
         
@@ -155,17 +164,16 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
         document.getElementById('meta-points').textContent = `${points.length.toLocaleString()} Points`;
         document.querySelectorAll('.stage-meta').forEach(el => el.classList.remove('hidden'));
 
-        await updateProgress(40, "Rendering Stage...", 500);
+        labels.forEach(el => el.textContent = "Rendering Stage...");
         if (isCancelled) throw new Error('CANCELLED');
         drawPoints(ctx, points);
 
         labels.forEach(el => el.textContent = "Constructing Greedy Skeleton...");
         const tour = await solveGreedyLive(ctx, points, (p) => {
             if (isCancelled) return;
-            const val = 40 + (p * 30);
-            currentProgress = val;
-            progressBar.style.width = `${val}%`;
-            percents.forEach(el => el.textContent = `${Math.round(val)}%`);
+            // Keep progress bar at 0% during greedy construction
+            progressBar.style.width = `0%`;
+            percents.forEach(el => el.textContent = `0%`);
         });
         if (isCancelled) throw new Error('CANCELLED');
         currentTour = tour;
@@ -177,10 +185,11 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
         console.log(`Starting optimization with maxPasses: ${optDepth}, breadth: ${optBreadth}`);
         await optimizeLive(ctx, points, tour, optDepth, optBreadth, (p) => {
             if (isCancelled) return;
-            const val = 70 + (p * 30);
+            // Progress bar moves from 0% to 100% ONLY during this stage
+            const val = Math.round(p * 100);
             currentProgress = val;
             progressBar.style.width = `${val}%`;
-            percents.forEach(el => el.textContent = `${Math.round(val)}%`);
+            percents.forEach(el => el.textContent = `${val}%`);
         });
         
         const finalDist = calculateTourDist(points, tour);

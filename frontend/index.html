@@ -83,6 +83,11 @@
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                         Print Masterpiece
                     </button>
+
+                    <button type="button" id="help-btn" class="info-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        How to Use
+                    </button>
                 </form>
             </section>
 
@@ -138,6 +143,40 @@
             </div>
         </main>
     </div>
+
+    <div id="help-modal" class="modal hidden">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h2>Studio Guide</h2>
+                <button id="close-help" class="icon-btn">&times;</button>
+            </header>
+            <div class="modal-body">
+                <section>
+                    <h3>What is TSP Art?</h3>
+                    <p>TSP Art transforms your images into a single, continuous line drawing. It uses the <strong>Travelling Salesperson Problem (TSP)</strong>—a classic mathematical challenge—to find the shortest possible path that visits thousands of points generated from your image's dark areas.</p>
+                </section>
+
+                <section>
+                    <h3>The Algorithm</h3>
+                    <ol>
+                        <li><strong>Stippling:</strong> Your image is processed into thousands of points (stipples) based on local density.</li>
+                        <li><strong>Greedy Skeleton:</strong> A fast initial path is built using a nearest-neighbor approach.</li>
+                        <li><strong>k-opt Untangling:</strong> A sophisticated Variable-Depth Search (Lin-Kernighan inspired) iteratively removes edge crossings, shortening and smoothing the final line.</li>
+                    </ol>
+                </section>
+
+                <section>
+                    <h3>Tunable Parameters</h3>
+                    <ul>
+                        <li><strong>Point Density:</strong> Controls how many points are generated. More points mean more detail but slower processing.</li>
+                        <li><strong>Optimization Depth:</strong> An exponential multiplier (0.1x to 1000x) that determines the search budget for untangling. Higher depth yields a cleaner, more optimal path.</li>
+                        <li><strong>Optimization Breadth:</strong> Determines the spatial search radius for finding intersections. Balanced (25%) is usually sufficient.</li>
+                    </ul>
+                </section>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js?v=2"></script>
 </body>
 </html>
