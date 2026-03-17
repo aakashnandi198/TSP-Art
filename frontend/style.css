@@ -1,0 +1,284 @@
+:root {
+    --bg-sidebar: #0f0f12;
+    --bg-stage: #050505;
+    --card-bg: #1a1a1e;
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;
+    --accent: #818cf8;
+    --accent-glow: rgba(129, 140, 248, 0.4);
+    --border: #27272a;
+    --canvas-bg: #000000;
+    --line-color: rgba(255, 255, 255, 0.9);
+    --line-secondary: rgba(129, 140, 248, 0.6);
+    --meta-bg: rgba(5, 5, 5, 0.4);
+    --progress-bg: rgba(255, 255, 255, 0.05);
+    --text-on-accent: #ffffff;
+}
+
+[data-theme="light"] {
+    --bg-sidebar: #f8fafc;
+    --bg-stage: #f1f5f9;
+    --card-bg: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --accent: #4f46e5;
+    --accent-glow: rgba(79, 70, 229, 0.2);
+    --border: #e2e8f0;
+    --canvas-bg: #ffffff;
+    --line-color: #0f172a;
+    --line-secondary: rgba(79, 70, 229, 0.6);
+    --meta-bg: rgba(255, 255, 255, 0.8);
+    --progress-bg: rgba(0, 0, 0, 0.05);
+    --text-on-accent: #ffffff;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+body {
+    font-family: "AppleGothic", "Apple Gothic", "ITC Avant Garde Gothic", "Inter", system-ui, sans-serif;
+    background-color: var(--bg-stage);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+}
+
+.app-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    height: 100vh;
+    width: 100vw;
+}
+
+.sidebar {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.brand { display: flex; align-items: center; justify-content: space-between; }
+.brand-left { display: flex; align-items: center; gap: 1rem; }
+.logo { color: var(--accent); display: flex; align-items: center; }
+.brand-text h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); }
+.brand-text p { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.1em; }
+
+.icon-btn {
+    background: transparent; border: none; color: var(--text-secondary); cursor: pointer;
+    padding: 0.5rem; border-radius: 8px; display: flex; align-items: center;
+}
+.icon-btn:hover { background: rgba(129, 140, 248, 0.1); color: var(--accent); }
+
+.controls-panel { display: flex; flex-direction: column; gap: 1.2rem; }
+.control-group { margin-bottom: 0.2rem; }
+.label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
+.label-row label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; }
+#points-value, #opt-depth-label, #opt-breadth-value { font-size: 0.8rem; color: var(--accent); font-weight: 700; }
+
+input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+.slider-markers { display: flex; justify-content: space-between; margin-top: 0.25rem; font-size: 0.6rem; color: var(--text-secondary); font-weight: 700; }
+
+button {
+    width: 100%; 
+    background: var(--accent); 
+    color: var(--text-on-accent); 
+    border: 1px solid var(--accent);
+    padding: 0.8rem; 
+    border-radius: 8px; 
+    font-weight: 600; 
+    cursor: pointer; 
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-family: inherit;
+}
+button:hover { filter: brightness(1.1); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.secondary-btn {
+    background: transparent; 
+    color: var(--accent);
+    margin-top: 0.5rem;
+}
+.secondary-btn:hover { background: var(--accent); color: var(--text-on-accent); }
+
+.reference-panel { margin-top: auto; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.panel-label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.75rem; font-weight: 700; }
+#file-name-display { font-size: 0.65rem; color: var(--accent); margin-bottom: 0.5rem; display: block; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
+.reference-card { background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); max-height: 180px; display: flex; align-items: center; justify-content: center; }
+#original-preview { max-width: 100%; max-height: 180px; display: block; opacity: 0.7; object-fit: contain; }
+
+.stage { position: relative; flex: 1; background: var(--bg-stage); display: flex; flex-direction: column; overflow: hidden; }
+
+.stage-overlay {
+    position: absolute; top: 0; left: 0; right: 0;
+    background: var(--bg-sidebar); border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(8px); z-index: 200;
+    padding: 0.75rem 0; display: flex; justify-content: center;
+}
+
+.loader-content {
+    width: 90%; max-width: 700px;
+    display: flex; align-items: center; gap: 1rem;
+}
+
+.progress-container {
+    flex: 1; height: 40px; background: var(--progress-bg);
+    border: 1px solid var(--border); border-radius: 8px;
+    position: relative; overflow: hidden;
+}
+
+.progress-bar {
+    position: absolute; height: 100%; width: 0%;
+    background: var(--accent); transition: width 0.3s ease;
+}
+
+.progress-text-layer {
+    position: absolute; width: 100%; height: 100%;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 1.25rem; font-size: 0.8rem; font-weight: 700;
+    text-transform: uppercase; pointer-events: none; white-space: nowrap;
+}
+.progress-text-layer.background { color: var(--text-secondary); z-index: 1; }
+.progress-text-layer.foreground { color: var(--text-on-accent); z-index: 2; width: 100%; }
+
+.cancel-action-btn {
+    flex-shrink: 0; width: 40px; height: 40px;
+    background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #ef4444; border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+}
+.cancel-action-btn:hover { background: #ef4444; color: white; }
+
+.art-viewport { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; padding: 2rem; }
+canvas { max-width: 100%; max-height: 100%; background: transparent; transition: all 0.3s ease; }
+canvas.has-art { 
+    background: var(--canvas-bg); 
+    box-shadow: 0 20px 50px rgba(0,0,0,0.3); 
+    border-radius: 4px;
+}
+[data-theme="light"] canvas.has-art {
+    box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+}
+
+.stage-placeholder {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    color: var(--text-secondary); text-align: center; cursor: pointer; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; gap: 1rem;
+}
+.stage-placeholder:hover { color: var(--accent); }
+
+.stage-meta {
+    position: absolute; padding: 0.5rem 1rem; font-size: 0.7rem; font-weight: 700;
+    color: var(--text-secondary); text-transform: uppercase; z-index: 20;
+    background: var(--meta-bg); backdrop-filter: blur(4px); border-radius: 4px; pointer-events: none;
+}
+.top-left { top: 4.5rem; left: 2rem; }
+.top-right { top: 4.5rem; right: 2rem; }
+.bottom-left { bottom: 2rem; left: 2rem; }
+.bottom-right { bottom: 2rem; right: 2rem; }
+
+.background-glow {
+    position: fixed; top: 0; left: 320px; width: calc(100% - 320px); height: 100%;
+    background: radial-gradient(circle at 50% 50%, #1e1b4b 0%, transparent 70%);
+    z-index: 0; opacity: 0.3; pointer-events: none; transition: background 0.5s ease;
+}
+[data-theme="light"] .background-glow { background: radial-gradient(circle at 50% 50%, #cbd5e1 0%, transparent 70%); opacity: 0.5; }
+
+.hidden { display: none !important; }
+
+@media print {
+    @page { margin: 0; size: auto; }
+    
+    body {
+        background: white !important;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Hide non-printable UI components */
+    .sidebar, .stage-overlay, .stage-placeholder, .background-glow, #theme-toggle { 
+        display: none !important; 
+    }
+
+    /* Full page layout for print */
+    .app-layout { 
+        display: block !important; 
+        width: 100vw !important;
+        height: 100vh !important;
+    }
+    
+    .stage { 
+        width: 100vw !important;
+        height: 100vh !important;
+        background: white !important; 
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        position: relative !important;
+    }
+    
+    .art-viewport {
+        position: absolute !important;
+        top: 0 !important; 
+        left: 0 !important; 
+        right: 0 !important; 
+        bottom: 0 !important;
+        padding: 2cm !important; /* Margin around the centered art */
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Print canvas centered, responsive to portrait/landscape */
+    canvas { 
+        max-width: 100% !important; 
+        max-height: 100% !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: contain !important;
+    }
+    
+    canvas.has-art {
+        box-shadow: none !important;
+        background: transparent !important;
+    }
+
+    /* Dark mode inversion so lines are black on white paper */
+    [data-theme="dark"] canvas.has-art {
+        filter: invert(1) grayscale(100%) brightness(0) !important;
+    }
+    
+    [data-theme="light"] canvas.has-art {
+        filter: grayscale(100%) brightness(0) !important;
+    }
+
+    /* Elegant metadata overlays in the corners */
+    .stage-meta { 
+        display: block !important; 
+        position: absolute !important;
+        color: #4f46e5 !important; /* Pleasant indigo color */
+        border: none !important; 
+        background: none !important;
+        font-size: 8pt !important;
+        font-family: "AppleGothic", "Apple Gothic", sans-serif !important;
+        letter-spacing: 0.02em !important;
+        padding: 0 !important;
+        opacity: 0.8 !important;
+    }
+
+    .top-left { top: 1cm !important; left: 1cm !important; text-align: left !important; }
+    .top-right { top: 1cm !important; right: 1cm !important; text-align: right !important; }
+    .bottom-left { bottom: 1cm !important; left: 1cm !important; text-align: left !important; }
+    .bottom-right { bottom: 1cm !important; right: 1cm !important; text-align: right !important; }
+}

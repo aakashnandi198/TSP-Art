@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSP Art Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+    <div class="background-glow"></div>
+    <div class="app-layout">
+        <aside class="sidebar">
+            <header class="brand">
+                <div class="brand-left">
+                    <div class="logo">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h.01"/><path d="M7 8l4-4 4 4"/><path d="M11 4v16"/><path d="M15 16l-4 4-4-4"/><path d="M21 12h-.01"/></svg>
+                    </div>
+                    <div class="brand-text">
+                        <h1>TSP Art</h1>
+                        <p>Mathematical Studio</p>
+                    </div>
+                </div>
+                <button id="theme-toggle" class="icon-btn" title="Toggle Theme">
+                    <svg class="sun hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                    <svg class="moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                </button>
+            </header>
+
+            <section class="controls-panel">
+                <form id="upload-form">
+                    <input type="file" id="image" name="file" accept="image/*" class="hidden" required>
+                    
+                    <div class="control-group">
+                        <div class="label-row">
+                            <label>Point Density</label>
+                            <span id="points-value">3,000 points</span>
+                        </div>
+                        <input type="range" id="num_points" name="num_points" value="3000" min="1000" max="1000000" step="1000">
+                        <div class="slider-markers">
+                            <span>1k</span>
+                            <span>250k</span>
+                            <span>500k</span>
+                            <span>750k</span>
+                            <span>1M</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <div class="label-row">
+                            <label>Optimization Depth</label>
+                            <span id="opt-depth-label">1.0x depth</span>
+                        </div>
+                        <input type="range" id="opt_depth" name="opt_depth" value="0" min="-1" max="3" step="0.01" 
+                               oninput="let v=Math.pow(10,parseFloat(this.value)); document.getElementById('opt-depth-label').textContent = (v < 10 ? v.toFixed(1) : Math.round(v)) + 'x depth'">
+                        <div class="slider-markers">
+                            <span>Fast</span>
+                            <span>Standard</span>
+                            <span>Deep</span>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <div class="label-row">
+                            <label>Optimization Breadth</label>
+                            <span id="opt-breadth-value">25% of edges</span>
+                        </div>
+                        <input type="range" id="opt_breadth" name="opt_breadth" value="25" min="1" max="100" step="1">
+                        <div class="slider-markers">
+                            <span>Targeted</span>
+                            <span>Balanced</span>
+                            <span>Exhaustive</span>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" id="submit-btn">
+                        Generate Art
+                    </button>
+
+                    <button type="button" id="print-btn" class="secondary-btn hidden">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        Print Masterpiece
+                    </button>
+                </form>
+            </section>
+
+            <section class="reference-panel hidden" id="reference-section">
+                <div class="panel-label">Reference Image</div>
+                <span id="file-name-display"></span>
+                <div class="reference-card">
+                    <img id="original-preview" src="" alt="Original Preview">
+                </div>
+            </section>
+        </aside>
+
+        <main class="stage">
+            <div id="loading" class="stage-overlay hidden">
+                <div class="loader-content">
+                    <div class="progress-container">
+                        <!-- Layer 1: Background Text -->
+                        <div class="progress-text-layer background">
+                            <span class="p-label">Initializing...</span>
+                            <span class="p-percent">0%</span>
+                        </div>
+                        
+                        <!-- Layer 2: Filling Bar -->
+                        <div class="progress-bar" id="progress-bar">
+                            <div class="progress-text-layer foreground">
+                                <span class="p-label">Initializing...</span>
+                                <span class="p-percent">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" id="cancel-btn" class="cancel-action-btn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div id="art-stage" class="art-viewport">
+                <!-- Metadata Overlays -->
+                <div class="stage-meta top-left hidden" id="meta-points">0 Points</div>
+                <div class="stage-meta top-right hidden" id="meta-algo">Nearest Neighbor + 3-opt (k-opt)</div>
+                <div class="stage-meta bottom-left hidden" id="meta-tsp">TSP: 0.00 px</div>
+                <div class="stage-meta bottom-right hidden" id="meta-greedy">Greedy: 0.00 px</div>
+                
+                <!-- Canvas will be sized dynamically -->
+                <canvas id="art-canvas"></canvas>
+            </div>
+            
+            <div class="stage-placeholder" id="placeholder">
+                <div class="upload-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </div>
+                <p>Upload an image to begin the generation</p>
+            </div>
+        </main>
+    </div>
+    <script src="app.js?v=2"></script>
+</body>
+</html>
