@@ -77,6 +77,7 @@ const fileNameDisplay = document.getElementById('file-name-display');
 const referenceSection = document.getElementById('reference-section');
 const refCard = document.getElementById('ref-card');
 const refModeBadge = document.getElementById('ref-mode-badge');
+const refLoader = document.getElementById('ref-loader');
 const originalPreview = document.getElementById('original-preview');
 
 // --- Slider Listeners (Consolidated) ---
@@ -133,6 +134,7 @@ let previewTimeout = null;
 async function updateLivePreview() {
     if (!currentFile) return;
     
+    refLoader.classList.remove('hidden');
     const formData = new FormData();
     formData.append('file', currentFile);
     formData.append('num_points', numPointsInput.value);
@@ -160,6 +162,8 @@ async function updateLivePreview() {
         }
     } catch (e) {
         console.error("Preview update failed", e);
+    } finally {
+        refLoader.classList.add('hidden');
     }
 }
 
@@ -213,12 +217,14 @@ const progressBar = document.getElementById('progress-bar');
 const labels = document.querySelectorAll('.p-label');
 const percents = document.querySelectorAll('.p-percent');
 const canvas = document.getElementById('art-canvas');
+const artFrame = document.getElementById('art-frame');
 const svgElement = document.getElementById('art-svg');
 const ctx = canvas.getContext('2d');
 
 function updateSVG(points, tour, width, height) {
     if (!tour || tour.length === 0) return;
     
+    artFrame.style.aspectRatio = `${width} / ${height}`;
     svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
     let d = `M ${points[tour[0]][0]} ${points[tour[0]][1]} `;
     for (let i = 1; i < tour.length; i++) {
