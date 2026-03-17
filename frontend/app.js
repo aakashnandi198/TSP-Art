@@ -5,6 +5,25 @@ let isCancelled = false;
 let currentPoints = null;
 let currentTour = null;
 
+// --- Zoom & Pan State ---
+let transform = {
+    x: 0,
+    y: 0,
+    scale: 1
+};
+let isDragging = false;
+let lastMousePos = { x: 0, y: 0 };
+
+function applyTransform(ctx) {
+    ctx.setTransform(transform.scale, 0, 0, transform.scale, transform.x, transform.y);
+}
+
+function resetTransform() {
+    transform = { x: 0, y: 0, scale: 1 };
+    redraw();
+}
+// ------------------------
+
 function setTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('tsp-art-theme', theme);
@@ -25,6 +44,8 @@ themeToggle.addEventListener('click', () => {
 
 function redraw() {
     if (!currentPoints) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (currentTour) {
         renderTour(ctx, currentPoints, currentTour, true);
     } else {
@@ -192,7 +213,21 @@ const progressBar = document.getElementById('progress-bar');
 const labels = document.querySelectorAll('.p-label');
 const percents = document.querySelectorAll('.p-percent');
 const canvas = document.getElementById('art-canvas');
+const svgElement = document.getElementById('art-svg');
 const ctx = canvas.getContext('2d');
+
+function updateSVG(points, tour, width, height) {
+    if (!tour || tour.length === 0) return;
+    
+    svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    let d = `M ${points[tour[0]][0]} ${points[tour[0]][1]} `;
+    for (let i = 1; i < tour.length; i++) {
+        d += `L ${points[tour[i]][0]} ${points[tour[i]][1]} `;
+    }
+    d += 'Z';
+    
+    svgElement.innerHTML = `<path d="${d}" fill="none" stroke="black" stroke-width="0.5" />`;
+}
 
 function handleFile(file) {
     if (!file) return;
@@ -334,6 +369,9 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
         document.getElementById('meta-tsp').innerHTML = `TSP: <strong>${finalDist.toFixed(2)} px</strong>`;
         document.getElementById('meta-algo').innerHTML = `Algorithm: <strong>Spatial Priority k-opt</strong>`;
         
+        // Generate high-resolution vector version for printing
+        updateSVG(points, tour, data.width, data.height);
+        
         loading.classList.add('hidden');
         printBtn.classList.remove('hidden');
         
@@ -362,11 +400,14 @@ function getThemeColors() {
 }
 
 function drawPoints(ctx, points) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    applyTransform(ctx);
     const colors = getThemeColors();
     ctx.fillStyle = colors.line;
     // Increase stipple size for better visibility
     for (const p of points) ctx.fillRect(p[0], p[1], 1.5, 1.5);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 function dist(p1, p2) { return Math.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2); }
@@ -521,10 +562,12 @@ function doIntersect(p1, p2, p3, p4) {
 }
 
 function renderTour(ctx, points, tour, isFinal = false) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    applyTransform(ctx);
     const colors = getThemeColors();
     ctx.strokeStyle = isFinal ? colors.line : colors.secondary;
-    ctx.lineWidth = 1.0; // Increased from 0.8
+    ctx.lineWidth = 1.0 / transform.scale; // Maintain visual weight while zooming
     ctx.beginPath();
     if (tour.length > 0) {
         ctx.moveTo(points[tour[0]][0], points[tour[0]][1]);
@@ -532,6 +575,7 @@ function renderTour(ctx, points, tour, isFinal = false) {
         ctx.closePath();
     }
     ctx.stroke();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 function reverse(arr, start, end) {
@@ -551,3 +595,56 @@ function calculateTourDist(points, tour) {
     }
     return d;
 }
+
+// --- Canvas Interaction Listeners ---
+canvas.addEventListener('mousedown', (e) => {
+    if (!currentPoints) return;
+    isDragging = true;
+    lastMousePos = { x: e.clientX, y: e.clientY };
+    canvas.style.cursor = 'grabbing';
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastMousePos.x;
+    const dy = e.clientY - lastMousePos.y;
+    transform.x += dx;
+    transform.y += dy;
+    lastMousePos = { x: e.clientX, y: e.clientY };
+    redraw();
+});
+
+window.addEventListener('mouseup', () => {
+    isDragging = false;
+    canvas.style.cursor = 'grab';
+});
+
+canvas.addEventListener('wheel', (e) => {
+    if (!currentPoints) return;
+    e.preventDefault();
+    
+    const delta = -e.deltaY;
+    const factor = Math.pow(1.1, delta / 100);
+    
+    // Zoom relative to mouse position
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const worldX = (mouseX - transform.x) / transform.scale;
+    const worldY = (mouseY - transform.y) / transform.scale;
+    
+    const newScale = Math.min(Math.max(transform.scale * factor, 0.1), 50);
+    
+    transform.scale = newScale;
+    transform.x = mouseX - worldX * transform.scale;
+    transform.y = mouseY - worldY * transform.scale;
+    
+    redraw();
+}, { passive: false });
+
+canvas.addEventListener('dblclick', () => {
+    if (!currentPoints) return;
+    resetTransform();
+});
+// ------------------------------------

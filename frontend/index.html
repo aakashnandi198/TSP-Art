@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
     <div class="background-glow"></div>
@@ -180,6 +180,7 @@
                 
                 <!-- Canvas will be sized dynamically -->
                 <canvas id="art-canvas"></canvas>
+                <svg id="art-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" class="print-only-svg"></svg>
             </div>
             
             <div class="stage-placeholder" id="placeholder">
@@ -214,16 +215,43 @@
 
                 <section>
                     <h3>Tunable Parameters</h3>
+                    
+                    <h4>1. Density</h4>
+                    <p><strong>Point Count:</strong> Determines the number of stipples generated from your image. More points yield higher detail but increase processing time significantly.</p>
+
+                    <h4>2. Pre-processing</h4>
+                    <p>Fine-tune your image before it's converted into points. Click the <strong>Reference View</strong> at the bottom of the sidebar to cycle between Original, Pre-processed, and Stippled views to see these changes in real-time.</p>
                     <ul>
-                        <li><strong>Point Density:</strong> Controls how many points are generated. More points mean more detail but slower processing.</li>
-                        <li><strong>Optimization Depth:</strong> An exponential multiplier (0.1x to 1000x) that determines the search budget for untangling. Higher depth yields a cleaner, more optimal path.</li>
-                        <li><strong>Optimization Breadth:</strong> Determines the spatial search radius for finding intersections. Balanced (25%) is usually sufficient.</li>
+                        <li><strong>Brightness & Contrast:</strong> Adjust these to bring out details or deepen shadows. High contrast often works best.</li>
+                        <li><strong>B/W Crush (Threshold):</strong> Crushes the image into stark black and white. Essential for high-contrast, graphic results.</li>
+                        <li><strong>Denoising:</strong> Smooths out digital noise to prevent "stray" points in clean areas.</li>
+                        <li><strong>Edge Strength:</strong> Sharpens silhouettes, helping the final line define the subject's features.</li>
                     </ul>
+
+                    <h4>3. Optimization</h4>
+                    <ul>
+                        <li><strong>Search Depth:</strong> An exponential search budget. Higher depth results in a cleaner, more optimal path by resolving complex edge crossings.</li>
+                        <li><strong>Search Breadth:</strong> Determines the spatial radius for finding intersections. 25% is usually the "sweet spot" for speed and quality.</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3>Canvas Interactions</h3>
+                    <ul>
+                        <li><strong>Zoom:</strong> Use the <strong>Mouse Wheel</strong> to zoom in and out at your cursor's position.</li>
+                        <li><strong>Pan:</strong> <strong>Click and Drag</strong> to move the art within the viewport.</li>
+                        <li><strong>Reset:</strong> <strong>Double-click</strong> the canvas to return to the original view.</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3>Vector Printing</h3>
+                    <p>The "Print Masterpiece" button generates a high-resolution <strong>Vector (SVG)</strong> version of your art. Unlike pixels, these lines are mathematically defined, ensuring your print is razor-sharp on any paper size, from A4 to large-format posters.</p>
                 </section>
             </div>
         </div>
     </div>
 
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=8"></script>
 </body>
 </html>

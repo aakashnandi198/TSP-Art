@@ -232,7 +232,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .cancel-action-btn:hover { background: #ef4444; color: white; }
 
 .art-viewport { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; padding: 2rem; }
-canvas { max-width: 100%; max-height: 100%; background: transparent; transition: all 0.3s ease; }
+canvas { 
+    max-width: 100%; 
+    max-height: 100%; 
+    background: transparent; 
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+    cursor: grab;
+}
 canvas.has-art { 
     background: var(--canvas-bg); 
     box-shadow: 0 20px 50px rgba(0,0,0,0.3); 
@@ -316,10 +322,13 @@ canvas.has-art {
 .modal-body p, .modal-body li { font-size: 0.95rem; line-height: 1.6; color: var(--text-primary); }
 .modal-body ul, .modal-body ol { padding-left: 1.2rem; }
 .modal-body li { margin-bottom: 0.5rem; }
+.print-only-svg {
+    display: none;
+}
 
 @media print {
     @page { margin: 0; size: auto; }
-    
+
     body {
         background: white !important;
         margin: 0;
@@ -328,13 +337,29 @@ canvas.has-art {
         height: 100%;
     }
 
-    /* Hide non-printable UI components */
-    .sidebar, .stage-overlay, .stage-placeholder, .background-glow, #theme-toggle { 
+    /* Hide non-printable UI components and the pixelated canvas */
+    .sidebar, .stage-overlay, .stage-placeholder, .background-glow, #theme-toggle, canvas { 
         display: none !important; 
+    }
+
+    /* Show the sharp vector SVG */
+    .print-only-svg {
+        display: block !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+    }
+
+    path {
+        stroke: black !important;
+        stroke-width: 0.5px !important; /* Fine-liner look */
+        fill: none !important;
     }
 
     /* Full page layout for print */
     .app-layout { 
+...
         display: block !important; 
         width: 100vw !important;
         height: 100vh !important;
