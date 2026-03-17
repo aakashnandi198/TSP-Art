@@ -24,7 +24,7 @@ The easiest way to launch the project is using Docker Compose:
    ```
 
 3. **Access the application:**
-   - Frontend: [http://localhost](http://localhost)
+   - Frontend: [http://localhost:5174](http://localhost:5174)
    - Backend API: [http://localhost:8000](http://localhost:8000)
 
 ## Tunable Parameters
