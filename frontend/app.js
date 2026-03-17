@@ -42,9 +42,144 @@ const optDepthInput = document.getElementById('opt_depth');
 const optDepthValue = document.getElementById('opt-depth-label');
 const optBreadthInput = document.getElementById('opt_breadth');
 const optBreadthValue = document.getElementById('opt-breadth-value');
+const contrastInput = document.getElementById('contrast');
+const contrastValue = document.getElementById('contrast-value');
+const brightnessInput = document.getElementById('brightness');
+const brightnessValue = document.getElementById('brightness-value');
+const thresholdInput = document.getElementById('threshold');
+const thresholdValue = document.getElementById('threshold-value');
+const blurInput = document.getElementById('blur');
+const blurValue = document.getElementById('blur-value');
+const sharpnessInput = document.getElementById('sharpness');
+const sharpnessValue = document.getElementById('sharpness-value');
 const fileNameDisplay = document.getElementById('file-name-display');
 const referenceSection = document.getElementById('reference-section');
+const refCard = document.getElementById('ref-card');
+const refModeBadge = document.getElementById('ref-mode-badge');
 const originalPreview = document.getElementById('original-preview');
+
+// --- Slider Listeners (Consolidated) ---
+numPointsInput.oninput = function() {
+    pointsValue.innerText = Number(this.value).toLocaleString() + " points";
+    debouncePreview();
+};
+
+optDepthInput.oninput = function() {
+    const v = Math.pow(10, parseFloat(this.value));
+    optDepthValue.innerText = (v < 10 ? v.toFixed(1) : Math.round(v)) + "x depth";
+};
+
+optBreadthInput.oninput = function() {
+    optBreadthValue.innerText = this.value + "% of edges";
+};
+
+brightnessInput.oninput = function() {
+    brightnessValue.innerText = parseFloat(this.value).toFixed(1) + "x";
+    debouncePreview();
+};
+
+contrastInput.oninput = function() {
+    contrastValue.innerText = parseFloat(this.value).toFixed(1) + "x";
+    debouncePreview();
+};
+
+thresholdInput.oninput = function() {
+    const val = parseInt(this.value);
+    thresholdValue.innerText = val === 0 ? "0 (Off)" : val;
+    debouncePreview();
+};
+
+blurInput.oninput = function() {
+    blurValue.innerText = parseFloat(this.value).toFixed(1) + " px";
+    debouncePreview();
+};
+
+sharpnessInput.oninput = function() {
+    sharpnessValue.innerText = parseFloat(this.value).toFixed(1) + "x";
+    debouncePreview();
+};
+// ---------------------------------------
+
+let refImageData = {
+    original: null,
+    preprocessed: null,
+    stippled: null
+};
+let currentRefMode = 'original'; // 'original', 'preprocessed', 'stippled'
+let currentFile = null;
+let previewTimeout = null;
+
+async function updateLivePreview() {
+    if (!currentFile) return;
+    
+    const formData = new FormData();
+    formData.append('file', currentFile);
+    formData.append('num_points', numPointsInput.value);
+    formData.append('contrast', contrastInput.value);
+    formData.append('blur', blurInput.value);
+    formData.append('sharpness', sharpnessInput.value);
+    formData.append('brightness', brightnessInput.value);
+    formData.append('threshold', thresholdInput.value);
+
+    try {
+        const backendHost = window.location.hostname;
+        const response = await fetch(`http://${backendHost}:8000/process-image`, {
+            method: 'POST', body: formData
+        });
+        
+        if (!response.ok) return;
+        const data = await response.json();
+        
+        refImageData.preprocessed = data.preprocessed_image;
+        refImageData.stippled = generateStippledPreview(data.points, data.width, data.height);
+        
+        // Update the view if we are currently looking at one of these modes
+        if (currentRefMode !== 'original') {
+            updateRefView();
+        }
+    } catch (e) {
+        console.error("Preview update failed", e);
+    }
+}
+
+function debouncePreview() {
+    if (previewTimeout) clearTimeout(previewTimeout);
+    previewTimeout = setTimeout(updateLivePreview, 400); // 400ms debounce
+}
+
+function updateRefView() {
+    if (currentRefMode === 'original') {
+        originalPreview.src = refImageData.original;
+        refModeBadge.textContent = 'Original';
+    } else if (currentRefMode === 'preprocessed') {
+        originalPreview.src = refImageData.preprocessed || refImageData.original;
+        refModeBadge.textContent = 'Pre-processed';
+    } else if (currentRefMode === 'stippled') {
+        originalPreview.src = refImageData.stippled || refImageData.original;
+        refModeBadge.textContent = 'Stippled';
+    }
+}
+
+refCard.addEventListener('click', () => {
+    const modes = ['original', 'preprocessed', 'stippled'];
+    let idx = modes.indexOf(currentRefMode);
+    currentRefMode = modes[(idx + 1) % modes.length];
+    updateRefView();
+});
+
+function generateStippledPreview(points, width, height) {
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tCtx = tempCanvas.getContext('2d');
+    tCtx.fillStyle = 'white';
+    tCtx.fillRect(0, 0, width, height);
+    tCtx.fillStyle = 'black';
+    for (const p of points) {
+        tCtx.fillRect(p[0], p[1], 1, 1);
+    }
+    return tempCanvas.toDataURL();
+}
 
 const submitBtn = document.getElementById('submit-btn');
 const printBtn = document.getElementById('print-btn');
@@ -59,26 +194,21 @@ const percents = document.querySelectorAll('.p-percent');
 const canvas = document.getElementById('art-canvas');
 const ctx = canvas.getContext('2d');
 
-numPointsInput.addEventListener('input', (e) => {
-    pointsValue.textContent = `${Number(e.target.value).toLocaleString()} points`;
-});
-
-optDepthInput.addEventListener('input', (e) => {
-    const val = Math.pow(10, parseFloat(e.target.value));
-    optDepthValue.textContent = `${val < 10 ? val.toFixed(1) : Math.round(val)}x depth`;
-});
-
-optBreadthInput.addEventListener('input', (e) => {
-    optBreadthValue.textContent = `${e.target.value}% of edges`;
-});
-
 function handleFile(file) {
     if (!file) return;
+    currentFile = file; // Store for live previews
     fileNameDisplay.textContent = file.name;
     const reader = new FileReader();
     reader.onload = (e) => {
-        originalPreview.src = e.target.result;
+        refImageData.original = e.target.result;
+        refImageData.preprocessed = null;
+        refImageData.stippled = null;
+        currentRefMode = 'original';
+        updateRefView();
         referenceSection.classList.remove('hidden');
+        
+        // Trigger first preview generation
+        updateLivePreview();
     };
     reader.readAsDataURL(file);
 }
@@ -160,6 +290,14 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
         currentTour = null;
         canvas.width = data.width;
         canvas.height = data.height;
+
+        // Store preprocessed and stippled previews
+        refImageData.preprocessed = data.preprocessed_image;
+        refImageData.stippled = generateStippledPreview(points, data.width, data.height);
+        
+        // Auto-switch to preprocessed view to show results
+        currentRefMode = 'preprocessed';
+        updateRefView();
         
         document.getElementById('meta-points').textContent = `${points.length.toLocaleString()} Points`;
         document.querySelectorAll('.stage-meta').forEach(el => el.classList.remove('hidden'));

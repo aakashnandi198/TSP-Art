@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
     <div class="background-glow"></div>
@@ -33,68 +33,115 @@
                 <form id="upload-form">
                     <input type="file" id="image" name="file" accept="image/*" class="hidden" required>
                     
-                    <div class="control-group">
-                        <div class="label-row">
-                            <label>Point Density</label>
-                            <span id="points-value">3,000 points</span>
+                    <!-- Section: Density -->
+                    <div class="control-section">
+                        <div class="control-section-header">
+                            <h3>Density</h3>
                         </div>
-                        <input type="range" id="num_points" name="num_points" value="3000" min="1000" max="1000000" step="1000">
-                        <div class="slider-markers">
-                            <span>1k</span>
-                            <span>250k</span>
-                            <span>500k</span>
-                            <span>750k</span>
-                            <span>1M</span>
-                        </div>
-                    </div>
-
-                    <div class="control-group">
-                        <div class="label-row">
-                            <label>Optimization Depth</label>
-                            <span id="opt-depth-label">1.0x depth</span>
-                        </div>
-                        <input type="range" id="opt_depth" name="opt_depth" value="0" min="-1" max="3" step="0.01" 
-                               oninput="let v=Math.pow(10,parseFloat(this.value)); document.getElementById('opt-depth-label').textContent = (v < 10 ? v.toFixed(1) : Math.round(v)) + 'x depth'">
-                        <div class="slider-markers">
-                            <span>Fast</span>
-                            <span>Standard</span>
-                            <span>Deep</span>
+                        <div class="control-group">
+                            <div class="label-row">
+                                <label>Point Count</label>
+                                <span id="points-value">3,000 points</span>
+                            </div>
+                            <input type="range" id="num_points" name="num_points" value="3000" min="1000" max="1000000" step="1000">
+                            <div class="slider-markers">
+                                <span>1k</span>
+                                <span>1M</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="control-group">
-                        <div class="label-row">
-                            <label>Optimization Breadth</label>
-                            <span id="opt-breadth-value">25% of edges</span>
+                    <!-- Section: Pre-processing -->
+                    <div class="control-section">
+                        <div class="control-section-header">
+                            <h3>Pre-processing</h3>
                         </div>
-                        <input type="range" id="opt_breadth" name="opt_breadth" value="25" min="1" max="100" step="1">
-                        <div class="slider-markers">
-                            <span>Targeted</span>
-                            <span>Balanced</span>
-                            <span>Exhaustive</span>
+                        <div class="control-group">
+                            <div class="label-row">
+                                <label>Brightness</label>
+                                <span id="brightness-value">1.0x</span>
+                            </div>
+                            <input type="range" id="brightness" name="brightness" value="1.0" min="0.5" max="2.0" step="0.1">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="label-row">
+                                <label>Contrast</label>
+                                <span id="contrast-value">1.5x</span>
+                            </div>
+                            <input type="range" id="contrast" name="contrast" value="1.5" min="0.5" max="5.0" step="0.1">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="label-row">
+                                <label>B/W Crush (Threshold)</label>
+                                <span id="threshold-value">0 (Off)</span>
+                            </div>
+                            <input type="range" id="threshold" name="threshold" value="0" min="0" max="255" step="5">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="label-row">
+                                <label>Denoising (Blur)</label>
+                                <span id="blur-value">0.0 px</span>
+                            </div>
+                            <input type="range" id="blur" name="blur" value="0" min="0" max="5" step="0.5">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="label-row">
+                                <label>Edge Strength</label>
+                                <span id="sharpness-value">1.0x</span>
+                            </div>
+                            <input type="range" id="sharpness" name="sharpness" value="1.0" min="0.0" max="10.0" step="0.5">
+                        </div>
+                    </div>
+
+                    <!-- Section: Optimization -->
+                    <div class="control-section">
+                        <div class="control-section-header">
+                            <h3>Optimization</h3>
+                        </div>
+                        <div class="control-group">
+                            <div class="label-row">
+                                <label>Search Depth</label>
+                                <span id="opt-depth-label">1.0x depth</span>
+                            </div>
+                            <input type="range" id="opt_depth" name="opt_depth" value="0" min="-1" max="3" step="0.01">
+                        </div>
+
+                        <div class="control-group">
+                            <div class="label-row">
+                                <label>Search Breadth</label>
+                                <span id="opt-breadth-value">25% of edges</span>
+                            </div>
+                            <input type="range" id="opt_breadth" name="opt_breadth" value="25" min="1" max="100" step="1">
                         </div>
                     </div>
                     
-                    <button type="submit" id="submit-btn">
-                        Generate Art
-                    </button>
+                    <div class="action-buttons">
+                        <button type="submit" id="submit-btn">
+                            Generate Art
+                        </button>
 
-                    <button type="button" id="print-btn" class="secondary-btn hidden">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                        Print Masterpiece
-                    </button>
+                        <button type="button" id="print-btn" class="secondary-btn hidden">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                            Print Masterpiece
+                        </button>
 
-                    <button type="button" id="help-btn" class="info-btn">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                        How to Use
-                    </button>
+                        <button type="button" id="help-btn" class="info-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            How to Use
+                        </button>
+                    </div>
                 </form>
             </section>
 
             <section class="reference-panel hidden" id="reference-section">
-                <div class="panel-label">Reference Image</div>
+                <div class="panel-label">Reference View (Click to cycle)</div>
                 <span id="file-name-display"></span>
-                <div class="reference-card">
+                <div class="reference-card" id="ref-card">
+                    <div id="ref-mode-badge" class="view-badge">Original</div>
                     <img id="original-preview" src="" alt="Original Preview">
                 </div>
             </section>
@@ -177,6 +224,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>
