@@ -5,6 +5,22 @@ let isCancelled = false;
 let currentPoints = null;
 let currentTour = null;
 
+async function checkBackendHealth() {
+    const backendHost = window.location.hostname || "localhost";
+    try {
+        const res = await fetch(`http://${backendHost}:8000/health`);
+        if (res.ok) {
+            console.log("Backend is healthy");
+        } else {
+            console.warn("Backend health check failed");
+        }
+    } catch (e) {
+        console.error("Backend unreachable", e);
+    }
+}
+setInterval(checkBackendHealth, 5000);
+checkBackendHealth();
+
 // --- Zoom & Pan State ---
 let transform = {
     x: 0,
@@ -89,10 +105,12 @@ numPointsInput.oninput = function() {
 optDepthInput.oninput = function() {
     const v = Math.pow(10, parseFloat(this.value));
     optDepthValue.innerText = (v < 10 ? v.toFixed(1) : Math.round(v)) + "x depth";
+    debouncePreview();
 };
 
 optBreadthInput.oninput = function() {
     optBreadthValue.innerText = this.value + "% of edges";
+    debouncePreview();
 };
 
 brightnessInput.oninput = function() {
@@ -130,27 +148,44 @@ let refImageData = {
 let currentRefMode = 'original'; // 'original', 'preprocessed', 'stippled'
 let currentFile = null;
 let previewTimeout = null;
+let previewAbortController = null;
 
 async function updateLivePreview() {
     if (!currentFile) return;
+    
+    // Abort previous request if it's still running
+    if (previewAbortController) {
+        previewAbortController.abort();
+    }
+    previewAbortController = new AbortController();
+    const { signal } = previewAbortController;
     
     refLoader.classList.remove('hidden');
     const formData = new FormData();
     formData.append('file', currentFile);
     formData.append('num_points', numPointsInput.value);
+    formData.append('opt_depth', optDepthInput.value);
     formData.append('contrast', contrastInput.value);
     formData.append('blur', blurInput.value);
     formData.append('sharpness', sharpnessInput.value);
     formData.append('brightness', brightnessInput.value);
     formData.append('threshold', thresholdInput.value);
+    formData.append('run_tsp', 'false');
 
     try {
-        const backendHost = window.location.hostname;
+        const backendHost = window.location.hostname || "localhost";
+        console.log(`Sending preview request to http://${backendHost}:8000/process-image`);
         const response = await fetch(`http://${backendHost}:8000/process-image`, {
-            method: 'POST', body: formData
+            method: 'POST', 
+            body: formData,
+            signal
         });
         
-        if (!response.ok) return;
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({ error: "Unknown error" }));
+            console.error("Server error:", errData.error);
+            return;
+        }
         const data = await response.json();
         
         refImageData.preprocessed = data.preprocessed_image;
@@ -161,6 +196,9 @@ async function updateLivePreview() {
             updateRefView();
         }
     } catch (e) {
+        if (e.name === 'AbortError') {
+            return;
+        }
         console.error("Preview update failed", e);
     } finally {
         refLoader.classList.add('hidden');
@@ -169,7 +207,7 @@ async function updateLivePreview() {
 
 function debouncePreview() {
     if (previewTimeout) clearTimeout(previewTimeout);
-    previewTimeout = setTimeout(updateLivePreview, 400); // 400ms debounce
+    previewTimeout = setTimeout(updateLivePreview, 500); // 500ms debounce
 }
 
 function updateRefView() {
@@ -283,6 +321,7 @@ fileInput.addEventListener('change', (e) => {
 document.getElementById('upload-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
+    formData.append('run_tsp', 'true');
     if (!fileInput.files.length) { alert('Please select an image first.'); return; }
 
     isCancelled = false;
@@ -318,6 +357,10 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     try {
         const backendHost = window.location.hostname;
         labels.forEach(el => el.textContent = "Generating Stipples...");
+        
+        // Pass opt_depth along to backend
+        formData.append('opt_depth', optDepthInput.value);
+        
         const response = await fetch(`http://${backendHost}:8000/process-image`, {
             method: 'POST', body: formData
         });
@@ -327,6 +370,8 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
         
         const data = await response.json();
         const points = data.points;
+        const jobId = data.job_id;
+        
         currentPoints = points;
         currentTour = null;
         canvas.width = data.width;
@@ -343,57 +388,100 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
         document.getElementById('meta-points').textContent = `${points.length.toLocaleString()} Points`;
         document.querySelectorAll('.stage-meta').forEach(el => el.classList.remove('hidden'));
 
-        labels.forEach(el => el.textContent = "Rendering Stage...");
-        if (isCancelled) throw new Error('CANCELLED');
         drawPoints(ctx, points);
 
-        labels.forEach(el => el.textContent = "Constructing Greedy Skeleton...");
-        const tour = await solveGreedyLive(ctx, points, (p) => {
-            if (isCancelled) return;
-            // Keep progress bar at 0% during greedy construction
-            progressBar.style.width = `0%`;
-            percents.forEach(el => el.textContent = `0%`);
+        // Polling logic
+        await new Promise((resolve, reject) => {
+            const pollInterval = setInterval(async () => {
+                if (isCancelled) {
+                    clearInterval(pollInterval);
+                    try {
+                        // Notify backend to cancel
+                        const bh = window.location.hostname || "localhost";
+                        await fetch(`http://${bh}:8000/cancel-job/${jobId}`, { method: 'POST' });
+                        // Try to fetch final partial state one last time
+                        const finalRes = await fetch(`http://${bh}:8000/job-status/${jobId}`);
+                        if (finalRes.ok) {
+                            const finalData = await finalRes.json();
+                            if (finalData.tour && finalData.tour.length > 0) {
+                                currentTour = finalData.tour;
+                                renderTour(ctx, points, currentTour, true);
+                            }
+                        }
+                    } catch (e) { console.warn("Failed final fetch after cancel", e); }
+                    reject(new Error('CANCELLED'));
+                    return;
+                }
+                
+                try {
+                    const statusRes = await fetch(`http://${backendHost}:8000/job-status/${jobId}`);
+                    if (!statusRes.ok) return;
+                    
+                    const statusData = await statusRes.json();
+                    
+                    if (statusData.status === 'error') {
+                        clearInterval(pollInterval);
+                        reject(new Error("Backend Error: " + statusData.error));
+                        return;
+                    }
+                    
+                    labels.forEach(el => el.textContent = statusData.stage + "...");
+                    
+                    const val = Math.round(statusData.progress * 100);
+                    progressBar.style.width = `${val}%`;
+                    percents.forEach(el => el.textContent = `${val}%`);
+                    
+                    if (statusData.tour && statusData.tour.length > 0) {
+                        currentTour = statusData.tour;
+                        renderTour(ctx, points, currentTour, statusData.status === 'completed');
+                        
+                        document.getElementById('meta-tsp').innerHTML = `TSP: <strong>${statusData.distance.toFixed(2)} px</strong>`;
+                        document.getElementById('meta-tsp').classList.remove('hidden');
+                        
+                        if (statusData.greedy_distance > 0) {
+                            document.getElementById('meta-greedy').innerHTML = `Greedy: <strong>${statusData.greedy_distance.toFixed(2)} px</strong>`;
+                            document.getElementById('meta-greedy').classList.remove('hidden');
+                        }
+                    }
+                    
+                    if (statusData.status === 'completed' || statusData.status === 'cancelled') {
+                        clearInterval(pollInterval);
+                        
+                        if (statusData.status === 'completed') {
+                            document.getElementById('meta-algo').innerHTML = `Algorithm: <strong>Backend k-opt</strong>`;
+                            updateSVG(points, currentTour, data.width, data.height);
+                            loading.classList.add('hidden');
+                            printBtn.classList.remove('hidden');
+                            resolve();
+                        } else {
+                            reject(new Error('CANCELLED'));
+                        }
+                    }
+                } catch (err) {
+                    console.error("Polling error", err);
+                }
+            }, 1000);
         });
-        if (isCancelled) throw new Error('CANCELLED');
-        currentTour = tour;
-
-        labels.forEach(el => el.textContent = "Live Untangling (k-opt)...");
-        const optDepthMultiplier = Math.pow(10, parseFloat(optDepthInput.value));
-        const optDepth = Math.max(1, Math.ceil(points.length * optDepthMultiplier));
-        const optBreadth = (parseInt(optBreadthInput.value) || 25) / 100;
-        console.log(`Starting optimization with maxPasses: ${optDepth}, breadth: ${optBreadth}`);
-        await optimizeLive(ctx, points, tour, optDepth, optBreadth, (p) => {
-            if (isCancelled) return;
-            // Progress bar moves from 0% to 100% ONLY during this stage
-            const val = Math.round(p * 100);
-            currentProgress = val;
-            progressBar.style.width = `${val}%`;
-            percents.forEach(el => el.textContent = `${val}%`);
-        });
-        
-        const finalDist = calculateTourDist(points, tour);
-        document.getElementById('meta-tsp').innerHTML = `TSP: <strong>${finalDist.toFixed(2)} px</strong>`;
-        document.getElementById('meta-algo').innerHTML = `Algorithm: <strong>Spatial Priority k-opt</strong>`;
-        
-        // Generate high-resolution vector version for printing
-        updateSVG(points, tour, data.width, data.height);
-        
-        loading.classList.add('hidden');
-        printBtn.classList.remove('hidden');
         
     } catch (error) {
         if (error.message === 'CANCELLED') {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            canvas.classList.remove('has-art');
-            placeholder.classList.remove('hidden');
-            document.querySelectorAll('.stage-meta').forEach(el => el.classList.add('hidden'));
+            // Keep the partial tour if we have one, just hide loading
+            console.log("Job cancelled, keeping partial results");
+            if (currentTour) {
+                updateSVG(currentPoints, currentTour, canvas.width, canvas.height);
+                printBtn.classList.remove('hidden');
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                canvas.classList.remove('has-art');
+                placeholder.classList.remove('hidden');
+                document.querySelectorAll('.stage-meta').forEach(el => el.classList.add('hidden'));
+            }
         } else {
             alert('Error: ' + error.message);
         }
         loading.classList.add('hidden');
     } finally {
         submitBtn.disabled = false;
-        isCancelled = false;
     }
 });
 
@@ -418,147 +506,9 @@ function drawPoints(ctx, points) {
 
 function dist(p1, p2) { return Math.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2); }
 
-async function solveGreedyLive(ctx, points, onProgress) {
-    const n = points.length;
-    if (n === 0) return [];
-    const unvisited = new Set(Array.from({length: n}, (_, i) => i));
-    const tour = [];
-    const cellSize = 30;
-    const grid = new Map();
-    for (let i = 0; i < n; i++) {
-        const key = `${Math.floor(points[i][0]/cellSize)},${Math.floor(points[i][1]/cellSize)}`;
-        if (!grid.has(key)) grid.set(key, []);
-        grid.get(key).push(i);
-    }
-    let currentIdx = 0;
-    tour.push(currentIdx);
-    unvisited.delete(currentIdx);
-    const greedyMeta = document.getElementById('meta-greedy');
 
-    while (unvisited.size > 0) {
-        if (isCancelled) return tour;
-        const p = points[currentIdx];
-        let bestD = Infinity, bestIdx = -1;
-        const gx = Math.floor(p[0]/cellSize), gy = Math.floor(p[1]/cellSize);
-        let found = false;
-        for (let r = 0; r <= 4 && !found; r++) {
-            for (let dx = -r; dx <= r; dx++) {
-                for (let dy = -r; dy <= r; dy++) {
-                    if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
-                    const cell = grid.get(`${gx+dx},${gy+dy}`);
-                    if (cell) {
-                        for (const idx of cell) {
-                            if (unvisited.has(idx)) {
-                                const d = (p[0]-points[idx][0])**2 + (p[1]-points[idx][1])**2;
-                                if (d < bestD) { bestD = d; bestIdx = idx; found = true; }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if (bestIdx === -1) {
-            for (const idx of unvisited) {
-                const d = (p[0]-points[idx][0])**2 + (p[1]-points[idx][1])**2;
-                if (d < bestD) { bestD = d; bestIdx = idx; }
-            }
-        }
-        tour.push(bestIdx);
-        unvisited.delete(bestIdx);
-        currentIdx = bestIdx;
-        if (tour.length % 500 === 0) {
-            renderTour(ctx, points, tour);
-            const currentGreedyDist = calculateTourDist(points, tour);
-            greedyMeta.innerHTML = `Greedy: <strong>${currentGreedyDist.toFixed(2)} px</strong>`;
-            onProgress(tour.length / n);
-            await new Promise(r => requestAnimationFrame(r));
-        }
-    }
-    const finalGreedyDist = calculateTourDist(points, tour);
-    greedyMeta.innerHTML = `Greedy: <strong>${finalGreedyDist.toFixed(2)} px</strong>`;
-    return tour;
-}
 
-async function optimizeLive(ctx, points, tour, nodeBudget, optBreadth, onProgress) {
-    const n = tour.length;
-    if (n < 4) return;
-    const tspMeta = document.getElementById('meta-tsp');
 
-    const cellSize = 50;
-    const grid = new Map();
-    function rebuildGrid() {
-        grid.clear();
-        for (let i = 0; i < n; i++) {
-            const p = points[tour[i]];
-            const key = `${Math.floor(p[0]/cellSize)},${Math.floor(p[1]/cellSize)}`;
-            if (!grid.has(key)) grid.set(key, []);
-            grid.get(key).push(i);
-        }
-    }
-
-    let movesDone = 0;
-    let improved = true;
-    let currentDist = calculateTourDist(points, tour);
-
-    while (improved && !isCancelled && movesDone < nodeBudget) {
-        improved = false;
-        rebuildGrid();
-
-        for (let i = 0; i < n; i++) {
-            // UI Yielding for large datasets
-            if (i % 2000 === 0) {
-                await new Promise(r => requestAnimationFrame(r));
-                if (isCancelled) return;
-            }
-
-            const t1 = i, t2 = (i + 1) % n;
-            const p1 = points[tour[t1]], p2 = points[tour[t2]];
-            const d12 = dist(p1, p2);
-
-            const gx = Math.floor(p1[0]/cellSize), gy = Math.floor(p1[1]/cellSize);
-            const radius = Math.max(1, Math.ceil(3 * optBreadth));
-
-            for (let dx = -radius; dx <= radius; dx++) {
-                for (let dy = -radius; dy <= radius; dy++) {
-                    const cell = grid.get(`${gx+dx},${gy+dy}`);
-                    if (!cell) continue;
-
-                    for (const t3 of cell) {
-                        const t4 = (t3 + 1) % n;
-                        if (t1 === t3 || t1 === t4 || t2 === t3) continue;
-
-                        const p3 = points[tour[t3]], p4 = points[tour[t4]];
-                        const d34 = dist(p3, p4);
-                        const d13 = dist(p1, p3);
-                        const d24 = dist(p2, p4);
-
-                        // 2-opt gain: (d12 + d34) - (d13 + d24)
-                        const gain = (d12 + d34) - (d13 + d24);
-
-                        if (gain > 0.01) {
-                            reverse(tour, t2, t3);
-                            currentDist -= gain;
-                            improved = true;
-                            movesDone++;
-
-                            if (movesDone % 100 === 0) {
-                                renderTour(ctx, points, tour, true);
-                                tspMeta.innerHTML = `TSP: <strong>${currentDist.toFixed(2)} px</strong>`;
-                                onProgress(Math.min(0.99, movesDone / nodeBudget));
-                                await new Promise(r => requestAnimationFrame(r));
-                                if (isCancelled) return;
-                            }
-                            break;
-                        }
-                    }
-                    if (improved) break;
-                }
-                if (improved) break;
-            }
-        }
-    }
-    renderTour(ctx, points, tour, true);
-}
 
 function doIntersect(p1, p2, p3, p4) {
     function ccw(A, B, C) {

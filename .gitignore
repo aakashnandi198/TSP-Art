@@ -11,3 +11,10 @@ venv/
 
 # OS
 .DS_Store
+
+# Compiled
+*.so
+*.o
+*.a
+*.dll
+*.dylib

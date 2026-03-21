@@ -3,14 +3,14 @@
 TSP Art Studio is a mathematical art project that transforms your images into single, continuous line drawings using the Travelling Salesperson Problem (TSP).
 
 ## Features
-- **Weighted Voronoi Stippling:** Converts images into a set of points (stipples) based on pixel density.
-- **Variable-Depth k-opt Optimization:** Shortens the tour by iteratively untangling intersections.
+- **Multi-threaded C++ Core:** High-performance TSP optimization engine using OpenMP for parallelized 2-opt untangling.
+- **Weighted Voronoi Stippling:** Converts images into a set of points (stipples) based on pixel density using fast KDTree-based centroids.
+- **Real-time Live Preview:** Interactive control panel with instant pre-processing and stippling feedback.
+- **Tunable Optimization:** Adjust Search Depth (budget) and Search Breadth (radius) to balance speed and quality.
 - **Museum-Quality Print:** High-contrast, beautifully formatted print layout for your masterpieces.
 - **Theme Support:** Modern Dark and Light modes.
 
-## Quick Start with Docker
-
-The easiest way to launch the project is using Docker Compose:
+## Quick Start (Manual - No Docker)
 
 1. **Clone the repository:**
    ```bash
@@ -18,21 +18,40 @@ The easiest way to launch the project is using Docker Compose:
    cd TSP-Art
    ```
 
-2. **Launch with Docker Compose:**
+2. **Backend Setup:**
    ```bash
-   docker-compose up --build
+   cd backend
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   # Compile C++ Core
+   g++ -O3 -fopenmp -shared -fPIC -static-libstdc++ -static-libgcc tsp_core.cpp -o libtsp_core.so
+   # Start Server
+   uvicorn main:app --host 0.0.0.0 --port 8000
    ```
 
-3. **Access the application:**
-   - Frontend: [http://localhost:5174](http://localhost:5174)
-   - Backend API: [http://localhost:8000](http://localhost:8000)
+3. **Frontend Setup:**
+   ```bash
+   cd frontend
+   python3 -m http.server 8080
+   ```
+
+4. **Access the application:**
+   - [http://localhost:8080](http://localhost:8080)
+
+## Quick Start with Docker
+
+```bash
+docker-compose up --build
+```
 
 ## Tunable Parameters
 - **Point Density:** Number of points generated from the image.
-- **Optimization Depth:** Exponential multiplier for the k-opt search budget.
-- **Optimization Breadth:** Spatial search radius for intersection detection.
+- **Search Depth:** Total budget for optimization swaps.
+- **Search Breadth:** Limits the spatial search radius for intersection detection (improves performance).
+- **Pre-processing:** Brightness, Contrast, Threshold, Denoising, and Edge Strength.
 
 ## Algorithm Details
-1. **Stippling:** Python backend uses SciPy's KDTree for fast Voronoi region calculation.
-2. **Greedy Initial Tour:** Nearest neighbor search for a fast starting path.
-3. **Live Untangling:** Variable-depth 2-opt search implemented in the browser for real-time visual feedback.
+1. **Stippling:** Python backend uses SciPy's KDTree for iterative Weighted Voronoi Stippling.
+2. **Greedy Initial Tour:** Fast nearest-neighbor construction using KDTree for immediate feedback.
+3. **C++ Optimization:** Parallelized 2-opt search implemented in C++ with OpenMP, exposed to Python via ctypes.

@@ -18,7 +18,9 @@ def generate_stipples(img_array: np.ndarray, num_points: int, iterations: int = 
     prob = (density / total_density).flatten()
     
     # Initial guess by sampling from density distribution
-    indices = np.random.choice(height * width, size=num_points, p=prob, replace=False)
+    # If num_points is more than available pixels with non-zero prob, replace=False fails.
+    # We use replace=True to be safe.
+    indices = np.random.choice(height * width, size=num_points, p=prob, replace=True)
     y, x = np.unravel_index(indices, (height, width))
     points = np.column_stack((x, y)).astype(float)
     
