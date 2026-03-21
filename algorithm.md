@@ -33,24 +33,22 @@ We start at an arbitrary point and iteratively move to the closest unvisited nei
 
 ---
 
-## Phase 3: Multi-threaded C++ k-opt Optimization (Backend)
+## Phase 3: Three-Phase Lin-Kernighan Optimization (Backend)
 
-The final phase is the most computationally intensive. We "untangle" the greedy skeleton to find a much shorter, cleaner path.
+The final phase is the most computationally intensive. We "untangle" the greedy skeleton using a high-performance **C++ core** parallelized with **OpenMP**.
 
-### 1. High-Performance C++ Core
-To handle tens of thousands of points, the core optimization loop is implemented in **C++** and parallelized with **OpenMP**. This allows the 2-opt search to utilize all available CPU cores.
-
-### 2. The 2-opt Swap
-The fundamental move is the **2-opt swap**. If we have two edges $(A, B)$ and $(C, D)$ that intersect, we can replace them with $(A, C)$ and $(B, D)$ by reversing the segment of the tour between $B$ and $C$.
-
-### 3. Gain Calculation & Parallel Search
-A swap is only performed if it results in a **positive gain** (reduction in total distance).
+### 1. The 2-opt Swap & Gain Logic
+The fundamental move is the **2-opt swap**. If we have two edges $(A, B)$ and $(C, D)$, we replace them with $(A, C)$ and $(B, D)$ only if the new configuration reduces the total distance.
 $$\text{Gain} = (\text{dist}(A, B) + \text{dist}(C, D)) - (\text{dist}(A, C) + \text{dist}(B, D))$$
-The C++ core parallelizes the search for the "best" improving swap across the entire tour using `omp parallel for`.
 
-### 4. Tunable Parameters
-- **Search Depth (Budget):** Controls the total number of successful swaps allowed.
-- **Search Breadth (Radius):** Limits the spatial search radius. Instead of checking every possible edge pair ($O(N^2)$), it only checks neighbors within a percentage of the tour length. This significantly improves performance on large point sets.
+### 2. Sequential Phase Logic
+To maximize visual impact and efficiency, the C++ core runs three distinct passes:
+1.  **Removing Intersections:** Uses a geometric intersection formula to strictly target and resolve crossing edges within a spatial neighborhood.
+2.  **Spatial Optimization:** Performs standard distance-reduction swaps within a spatial radius defined by the *Search Breadth* slider.
+3.  **Global Refinement:** An exhaustive, non-spatial scan of every edge pair in the entire tour to guarantee a true local optimum.
+
+### 3. Parallel Search
+The optimizer parallelizes the search for the best improving swap across all CPU cores using `#pragma omp parallel for`, allowing it to handle 100,000+ points in seconds.
 
 ---
 
@@ -60,8 +58,8 @@ The C++ core parallelizes the search for the "best" improving swap across the en
 | :--- | :--- | :--- | :--- |
 | **Stippling** | Weighted Lloyd's | $O(I \cdot N \log N)$ | Backend (Python/SciPy) |
 | **Initial Tour** | Fast Greedy NN | $O(N \log N)$ | Backend (Python/KDTree) |
-| **Optimization** | Parallel 2-opt | $O(\text{Budget} \cdot \text{Breadth} \cdot N)$ | Backend (C++/OpenMP) |
+| **Optimization** | Three-Phase Parallel k-opt | $O(\text{Scans} \cdot \text{Breadth} \cdot N)$ | Backend (C++/OpenMP) |
 
 *where $N$ is the number of points and $I$ is the number of stippling iterations.*
 
-The backend provides updates to the frontend every ~800ms, ensuring a smooth, real-time visualization of the "untangling" process.
+The backend provides updates to the frontend every ~800ms, ensuring a smooth, real-time visualization of the stability-based progress bar.

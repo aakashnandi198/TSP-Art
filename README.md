@@ -3,10 +3,10 @@
 TSP Art Studio is a mathematical art project that transforms your images into single, continuous line drawings using the Travelling Salesperson Problem (TSP).
 
 ## Features
-- **Multi-threaded C++ Core:** High-performance TSP optimization engine using OpenMP for parallelized 2-opt untangling.
+- **Multi-threaded C++ Core:** High-performance Lin-Kernighan inspired optimization engine using OpenMP for parallelized k-opt untangling.
 - **Weighted Voronoi Stippling:** Converts images into a set of points (stipples) based on pixel density using fast KDTree-based centroids.
+- **Three-Phase Optimization:** Sequential logic focusing on Intersection Removal, Spatial Optimization, and Global Refinement.
 - **Real-time Live Preview:** Interactive control panel with instant pre-processing and stippling feedback.
-- **Tunable Optimization:** Adjust Search Depth (budget) and Search Breadth (radius) to balance speed and quality.
 - **Museum-Quality Print:** High-contrast, beautifully formatted print layout for your masterpieces.
 - **Theme Support:** Modern Dark and Light modes.
 
@@ -54,4 +54,4 @@ docker-compose up --build
 ## Algorithm Details
 1. **Stippling:** Python backend uses SciPy's KDTree for iterative Weighted Voronoi Stippling.
 2. **Greedy Initial Tour:** Fast nearest-neighbor construction using KDTree for immediate feedback.
-3. **C++ Optimization:** Parallelized 2-opt search implemented in C++ with OpenMP, exposed to Python via ctypes.
+3. **C++ Optimization:** Parallelized Lin-Kernighan inspired Variable-Depth search implemented in C++ with OpenMP, exposed to Python via ctypes. Focuses on crossover resolution before global refinement.

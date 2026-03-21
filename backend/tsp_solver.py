@@ -4,6 +4,7 @@ import math
 from scipy.spatial import cKDTree
 import ctypes
 import os
+import time
 
 # --- C++ Core Setup ---
 lib_path = os.path.join(os.path.dirname(__file__), "libtsp_core.so")
@@ -175,14 +176,11 @@ def run_tsp_job(job_id, points_list, node_budget, opt_breadth, jobs_dict):
             # We treat the optimization as having multiple potential full scans.
             # We'll show progress based on the current scan position and swaps.
 
-            while moves_done < node_budget and jobs_dict[job_id].get("status") != "cancelled":
+            while jobs_dict[job_id].get("status") != "cancelled":
                 # Call C++ for ~800ms
+                # last_i now represents the stability counter (consecutive points without swaps) + phase*N
                 current_dist = cpp_core.optimize_tour(state_ptr, 800, ctypes.c_int(opt_breadth), ctypes.byref(swaps_done), ctypes.byref(last_i), ctypes.byref(c_is_cancelled))
                 swaps = swaps_done.value
-
-                # If no swaps were found AND we finished a full scan, we are done
-                if swaps == 0 and last_i.value == 0:
-                    break
 
                 moves_done += swaps
 
@@ -192,18 +190,27 @@ def run_tsp_job(job_id, points_list, node_budget, opt_breadth, jobs_dict):
                 jobs_dict[job_id]["tour"] = tour.tolist()
                 jobs_dict[job_id]["distance"] = float(current_dist)
 
-                # Smoother progress: 10% (greedy) + 90% (opt)
-                # Within opt: mix of swap budget and current scan progress
-                swap_prog = (moves_done / node_budget) if node_budget > 0 else 0
-                scan_prog = (last_i.value / n)
+                # last_i now contains (phase * n) + current_index
+                phase = last_i.value // n
+                current_idx = last_i.value % n
+                
+                # Update Stage name
+                stages = ["Removing Intersections", "Spatial Optimization", "Global Refinement"]
+                jobs_dict[job_id]["stage"] = stages[min(2, phase)]
 
-                # perceived_opt = 80% swap_budget + 20% current_scan_position
-                perceived_opt = min(0.99, swap_prog * 0.8 + scan_prog * 0.2)
+                # If no swaps were found AND we finished all phases, we are TRULY done
+                if swaps == 0 and phase >= 2 and current_idx == 0:
+                    break
 
-                jobs_dict[job_id]["progress"] = 0.1 + 0.9 * perceived_opt
+                # Progress: 10% (greedy) + 90% (opt)
+                # 3 phases, each takes roughly 30%
+                phase_prog = (phase / 3.0) + (current_idx / (n * 3.0))
+                jobs_dict[job_id]["progress"] = 0.1 + 0.9 * min(0.99, phase_prog)
 
                 if jobs_dict[job_id].get("status") == "cancelled":
                     c_is_cancelled.value = 1
+                
+                time.sleep(0.1)
                 
             cpp_core.free_tsp(state_ptr)
             
