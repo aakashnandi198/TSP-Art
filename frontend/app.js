@@ -4,6 +4,68 @@ const moonIcon = themeToggle.querySelector('.moon');
 let isCancelled = false;
 let currentPoints = null;
 let currentTour = null;
+let isJobCompleted = false;
+let activeHighlights = [];
+const HIGHLIGHT_DURATION = 1000;
+
+function getChangedEdges(oldTour, newTour) {
+    if (!oldTour || oldTour.length !== newTour.length) return [];
+    
+    // For large tours, a Set of strings is faster than nested loops
+    const oldEdges = new Set();
+    for (let i = 0; i < oldTour.length; i++) {
+        const u = oldTour[i];
+        const v = oldTour[(i + 1) % oldTour.length];
+        oldEdges.add(u < v ? `${u}-${v}` : `${v}-${u}`);
+    }
+    
+    const changed = [];
+    for (let i = 0; i < newTour.length; i++) {
+        const u = newTour[i];
+        const v = newTour[(i + 1) % newTour.length];
+        const key = u < v ? `${u}-${v}` : `${v}-${u}`;
+        if (!oldEdges.has(key)) {
+            changed.push([u, v]);
+        }
+    }
+    return changed;
+}
+
+function addHighlights(edges) {
+    const now = Date.now();
+    // Limit number of highlights to prevent performance issues
+    const limit = 2000;
+    const toAdd = edges.slice(-limit);
+    
+    for (const edge of toAdd) {
+        activeHighlights.push({
+            u: edge[0],
+            v: edge[1],
+            startTime: now
+        });
+    }
+    
+    if (activeHighlights.length > 0 && !animationFrameId) {
+        animationFrameId = requestAnimationFrame(animationTick);
+    }
+}
+
+let animationFrameId = null;
+function animationTick() {
+    const now = Date.now();
+    const beforeCount = activeHighlights.length;
+    activeHighlights = activeHighlights.filter(h => now - h.startTime < HIGHLIGHT_DURATION);
+    
+    if (activeHighlights.length > 0 || beforeCount > 0) {
+        redraw();
+    }
+    
+    if (activeHighlights.length > 0) {
+        animationFrameId = requestAnimationFrame(animationTick);
+    } else {
+        animationFrameId = null;
+    }
+}
 
 async function checkBackendHealth() {
     const backendHost = window.location.hostname || "localhost";
@@ -63,7 +125,7 @@ function redraw() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (currentTour) {
-        renderTour(ctx, currentPoints, currentTour, true);
+        renderTour(ctx, currentPoints, currentTour, isJobCompleted);
     } else {
         drawPoints(ctx, currentPoints);
     }
@@ -325,6 +387,8 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
     if (!fileInput.files.length) { alert('Please select an image first.'); return; }
 
     isCancelled = false;
+    isJobCompleted = false;
+    activeHighlights = [];
     submitBtn.disabled = true;
     printBtn.classList.add('hidden');
     loading.classList.remove('hidden');
@@ -405,6 +469,7 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
                             const finalData = await finalRes.json();
                             if (finalData.tour && finalData.tour.length > 0) {
                                 currentTour = finalData.tour;
+                                isJobCompleted = true;
                                 renderTour(ctx, points, currentTour, true);
                             }
                         }
@@ -432,8 +497,17 @@ document.getElementById('upload-form').addEventListener('submit', async (e) => {
                     percents.forEach(el => el.textContent = `${val}%`);
                     
                     if (statusData.tour && statusData.tour.length > 0) {
-                        currentTour = statusData.tour;
-                        renderTour(ctx, points, currentTour, statusData.status === 'completed');
+                        const newTour = statusData.tour;
+                        isJobCompleted = (statusData.status === 'completed');
+                        
+                        // Find and highlight modifications
+                        const changes = getChangedEdges(currentTour, newTour);
+                        if (changes.length > 0) {
+                            addHighlights(changes);
+                        }
+
+                        currentTour = newTour;
+                        renderTour(ctx, points, currentTour, isJobCompleted);
                         
                         document.getElementById('meta-tsp').innerHTML = `TSP: <strong>${statusData.distance.toFixed(2)} px</strong>`;
                         document.getElementById('meta-tsp').classList.remove('hidden');
@@ -522,8 +596,10 @@ function renderTour(ctx, points, tour, isFinal = false) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     applyTransform(ctx);
     const colors = getThemeColors();
+    
+    // 1. Draw the base tour
     ctx.strokeStyle = isFinal ? colors.line : colors.secondary;
-    ctx.lineWidth = 1.0 / transform.scale; // Maintain visual weight while zooming
+    ctx.lineWidth = 1.0 / transform.scale; 
     ctx.beginPath();
     if (tour.length > 0) {
         ctx.moveTo(points[tour[0]][0], points[tour[0]][1]);
@@ -531,6 +607,26 @@ function renderTour(ctx, points, tour, isFinal = false) {
         ctx.closePath();
     }
     ctx.stroke();
+
+    // 2. Draw active highlights (modified edges)
+    const now = Date.now();
+    for (const h of activeHighlights) {
+        const elapsed = now - h.startTime;
+        const opacity = Math.max(0, 1 - elapsed / HIGHLIGHT_DURATION);
+        
+        // Use a bright amber/gold for highlights
+        ctx.strokeStyle = `rgba(251, 191, 36, ${opacity})`;
+        ctx.lineWidth = 2.0 / transform.scale; 
+        ctx.beginPath();
+        const p1 = points[h.u];
+        const p2 = points[h.v];
+        if (p1 && p2) {
+            ctx.moveTo(p1[0], p1[1]);
+            ctx.lineTo(p2[0], p2[1]);
+            ctx.stroke();
+        }
+    }
+    
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
 
